@@ -1,0 +1,255 @@
+import re
+
+tokens = [
+    (r'\+', 'Add'),
+    (r'-', 'Sub'),
+    (r'\*', 'Mul'),
+    (r'/', 'Div'),
+    (r'%', 'Mod'),
+    (r'\(', 'LPar'),
+    (r'\)', 'RPar'),
+    (r'\{', 'LBrace'),
+    (r'\}', 'RBrace'),
+    (r'=', 'Assign'),
+    (r'==', 'Equal'),
+    (r'<', 'Less'),
+    (r'<=', 'LessEqual'),
+    (r'!=', 'NotEqual'),
+    (r'>', 'Great'),
+    (r'>=', 'GreatEqual'),
+    (r'&&', 'And'),
+    (r'\|\|', 'Or'),
+    (r'[a-zA-Z_][a-zA-Z0-9_]*', 'Variable'),
+    (r'\d+\.\d+', 'Float'),
+    (r'\d+', 'Int'),
+    (r';', 'Semicolon'),
+    (r'if', 'If'),
+    (r'while', 'While'),
+    (r'else', 'Else'),
+    (r'DataType', 'DataType'),
+    (r'if', 'If'),
+    (r'while', 'While'),
+    (r',', 'Comma')
+]
+
+tokens = [(re.compile(p[0]), p[1]) for p in tokens]
+
+
+class Parser:
+    
+    def __init__(self, tokens):
+        self.tokens = tokens
+        self.current_token = None
+        self.index = -1
+        self.advance()
+
+    def advance(self):
+        self.index += 1
+        if self.index < len(self.tokens):
+            self.current_token = self.tokens[self.index]
+        else:
+            self.current_token = None
+
+    def match(self, token_type):
+        if self.current_token is not None and self.current_token == token_type:
+            self.advance()
+        return False
+
+    def parse(self):
+        return self.stmt_list()
+
+    def stmt(self):
+        if self.current_token == 'If':
+            return self.if_stmt()
+        elif self.current_token == 'LBrace':
+            return self.block()
+        elif self.current_token == 'DataType':
+            return self.declare()
+        elif self.current_token == 'While':
+            return self.while_loop()
+        elif self.current_token == 'Variable':
+            return self.assign()
+        else:
+            return False
+
+    def stmt_list(self):
+        if not self.stmt():
+            return False
+        if not self.match('Semicolon'):
+            return False
+        return True
+
+    def while_loop(self):
+        if not self.match('While'):
+            return False
+
+        if not self.match('LPar'):
+            return False
+
+        bool_expr = self.bool_expr(current_token)
+        if not bool_expr:
+            return False
+
+        if not self.match('RPar'):
+            return False
+
+        block = self.block(current_token)
+        if not block:
+            return False
+        
+        return True
+
+    def if_stmt(self):
+        if not self.match('If'):
+            return False
+
+        if not self.match('LPar'):
+            return False
+
+        bool_expr = self.bool_expr(current_token)
+        if not bool_expr:
+            return False
+
+        if not self.match('RPar'):
+            return False
+
+        if self.match('Else'):
+            block = self.block()
+            if not block:
+                return False
+
+        return True
+
+    def block(self):
+        if not self.match('LBrace'):
+            return False
+
+        if not self.stmt_list():
+            return False
+
+        if not self.match('RBrace'):
+            return False
+
+        return True
+    
+    def declare(self):
+        if not self.match('DataType'):
+            return False
+        if not self.match('Variable'):
+            return False
+        if self.match('Comma'):
+            if not self.match('Variable'):
+                return False
+        return True
+    
+    def assign(self):
+        if not self.match('Variable'):
+            return False
+        if not self.match('Assign'):
+            return False
+        if not self.expr():
+            return False
+        return True
+
+    def expr(self):
+        if not self.term():
+            return False
+
+        if self.match('Add') or self.match('Sub'):
+            if not self.term():
+                return False
+
+        return True
+
+    def term(self):
+        if not self.fact():
+            return False
+
+        if self.match('Mul') or self.match('Div') or self.match('Mod'):
+            if not self.fact():
+                return False
+
+        return True
+
+    def fact(self):
+        if self.match('Variable') or self.match('Int') or self.match('Float'):
+            return True
+
+        if self.match('LPar'):
+            if not self.expr():
+                return False
+
+            if not self.match('RPar'):
+                return False
+
+            return True
+
+        return False
+
+    def bool_expr(self):
+        if not self.bterm():
+            return False
+
+        if self.match('Less') or self.match('LessEqual') or self.match('Great') or self.match('GreatEqual'):
+            if not self.bterm():
+                return False
+
+        return True
+    
+    def bterm(self):
+        if not self.band():
+            return False
+
+        if self.match('Equal') or self.match('NotEqual'):
+            if not self.band():
+                return False
+
+        return True
+
+    def band(self):
+        if not self.bor():
+            return False
+
+        if self.match('And'):
+            if not self.bor():
+                return False
+
+        return True
+
+    def bor(self):
+        if not self.expr():
+            return False
+    
+        if self.match('Or'):
+            if not self.expr():
+                return False
+
+        return True
+    
+    
+    
+
+def tokenize(code):
+    listoftokens = []
+    i = 0
+    while i < len(code):
+        match = None
+        for pattern, token_type in tokens:
+            match = pattern.match(code, i)
+            if match:
+                value = match.group(0)
+                if token_type:
+                    listoftokens.append((token_type, value))
+                    print(value)
+                break
+        if not match:
+            raise SyntaxError("Invalid token: {code[i]}")
+        else:
+            i = match.end()
+    return listoftokens
+
+file = open("./test.txt", "r")
+Wheat = file.read()
+Corn = tokenize(Wheat)
+parser = Parser(Corn)
+print(parser.parse())
